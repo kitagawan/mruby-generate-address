@@ -1,0 +1,87 @@
+class Generate_Address
+ def initialize
+    seed=SecureRandom.hex(16)
+    #secp256k1のパラメータ
+    @b_x="0x79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798".to_i(16)
+    @b_y="0x483ADA7726A3C4655DA4FBFC0E1108A8FD17B448A68554199C47D08FFB10D4B8".to_i(16)
+    @prime="0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F".to_i(16)
+    root_seed=seed
+    data=[root_seed].pack("H*")
+    key='Bitcoin seed'
+    l=Digest::HMAC.digest(data,key,Digest::SHA512)
+    @priv_key=l[0..31].unpack("H*")[0]
+    @chain_code=l[32..-1]
+ end
+
+  def mod(n)
+    return n % @prime
+  end
+
+  def inverse(m)
+    remainders = [m, @prime]
+    s = [1, 0]
+    t = [0, 1]
+    arrays = [remainders, s, t]
+    while remainders.last > 0 
+      if remainders[-2]<0
+        quotient=-1
+      else
+        quotient = remainders[-2] / remainders[-1]
+      end
+      arrays.each do |array|
+        flag=array[-2] - quotient * array[-1]
+        array << array[-2] - quotient * array[-1]
+      end
+    end
+    return mod(s[-2])
+  end
+
+def pub(key)
+  str=key.to_s(2).split(//)
+  i=1
+  point_p=[@b_x,@b_y]
+  point_q=[@b_x,@b_y]
+  while str[i] != nil 
+    if str[i]=="1"
+    ramda=mod(3*point_p[-2]*point_p[-2])*inverse(2*point_p[-1])
+    sum_x=mod((ramda*ramda)-point_p[-2]-point_p[-2])
+    sum_y=mod(ramda*(point_p[-2]-sum_x)-point_p[-1])
+    point_p=[sum_x,sum_y]
+
+    ramda=mod(point_p[-1]-point_q[-1])*inverse(point_p[-2]-point_q[-2])
+    sum_x=mod((ramda*ramda)-point_p[-2]-point_q[-2])
+    sum_y=mod(ramda*(point_p[-2]-sum_x)-point_p[-1])
+    point_p=[sum_x,sum_y]
+    i=i+1
+    elsif str[i]=="0"
+  
+    ramda=mod(3*point_p[-2]*point_p[-2])*inverse(2*point_p[-1])
+
+    sum_x=mod((ramda*ramda)-point_p[-2]-point_p[-2])
+ 
+    sum_y=mod(ramda*(point_p[-2]-sum_x)-point_p[-1])
+ 
+    point_p=[sum_x,sum_y]
+    i=i+1
+    end
+  end
+  if point_p[1]%2==0
+    return "02"+point_p[0].to_s(16)
+  else
+    return "03"+point_p[0].to_s(16)
+  end
+end
+def genekey
+  index=SecureRandom.hex(4).to_i(16)
+  data=index+@priv_key.to_i(16)
+  data=pub(data)
+  key=@chain_code
+  k_p=Digest::HMAC.digest(data,key,Digest::SHA512)
+  bprive_key=@priv_key
+  @priv_key=k_p[0..31].unpack("H*")[0]
+  @chain_code=k_p[32..-1]
+  t=bprive_key.to_i(16)+@priv_key.to_i(16)
+  ch_pubkey=pub(t)
+  p "生成結果:"+ch_pubkey
+end
+end
